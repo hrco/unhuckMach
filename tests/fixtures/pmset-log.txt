@@ -1,0 +1,6 @@
+2026-10-26 01:02:03 +0200 DarkWake              	DarkWake from Deep Idle [CDNVA] : due to Notification Using AC
+2026-10-26 01:12:03 +0200 Sleep                	Entering Sleep state due to 'Maintenance Sleep'
+2026-10-26 02:02:03 +0200 DarkWake              	DarkWake from Deep Idle [CDNVA] : due to SMC.OutboxNotEmpty
+2026-10-26 02:12:03 +0200 Sleep                	Entering Sleep state due to 'Maintenance Sleep'
+2026-10-26 08:00:00 +0200 Wake                 	Wake from Deep Idle [CDNVA] : due to UserActivity Assertion
+2026-10-26 23:00:00 +0200 Sleep                	Entering Sleep state due to 'Clamshell Sleep'

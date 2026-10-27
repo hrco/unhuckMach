@@ -1,0 +1,5 @@
+Executable=/tmp/x
+Identifier=x
+Format=Mach-O thin (arm64)
+CodeDirectory v=20400 size=300 flags=0x2(adhoc) hashes=4+2 location=embedded
+Signature=adhoc

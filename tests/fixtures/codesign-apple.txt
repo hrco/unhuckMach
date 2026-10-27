@@ -1,0 +1,6 @@
+Executable=/usr/bin/ssh
+Identifier=com.apple.ssh
+Format=Mach-O universal (x86_64 arm64e)
+Authority=Software Signing
+Authority=Apple Code Signing Certification Authority
+Authority=Apple Root CA

@@ -1,0 +1,9 @@
+##
+# Host Database
+##
+127.0.0.1	localhost
+255.255.255.255	broadcasthost
+::1             localhost
+
+0.0.0.0 apple.com
+185.0.0.1 www.paypal.com

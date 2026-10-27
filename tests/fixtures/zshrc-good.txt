@@ -1,0 +1,4 @@
+export PATH="$HOME/bin:$PATH"
+alias ll='ls -la'
+eval "$(/opt/homebrew/bin/brew shellenv)"
+source ~/.nvm/nvm.sh
