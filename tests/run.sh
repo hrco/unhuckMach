@@ -41,6 +41,24 @@ assert_not_contains "few dark wakes -> no flag" "$out" "[MED]"
 out=$( { for i in $(seq 1 31); do echo "x DarkWake y"; done; } | uh_wake_summary )
 assert_contains "many dark wakes -> MED" "$out" "[MED] 31 dark wakes"
 
+IOREG_FIXTURE='  |   "MaxCapacity" = 100
+  |   "CycleCount" = 52
+  |   "BatteryData" = {"FullChargeCapacity"=4801,"NominalChargeCapacity"=4968,"DesignCapacity"=4800,"MaxCapacity"=100}'
+assert_eq "ioreg nested FullChargeCapacity" "$(uh_ioreg_num "$IOREG_FIXTURE" FullChargeCapacity)" "4801"
+assert_eq "ioreg nested DesignCapacity" "$(uh_ioreg_num "$IOREG_FIXTURE" DesignCapacity)" "4800"
+assert_eq "ioreg top-level CycleCount" "$(uh_ioreg_num "$IOREG_FIXTURE" CycleCount)" "52"
+assert_eq "ioreg missing key" "$(uh_ioreg_num "$IOREG_FIXTURE" AppleRawMaxCapacity)" ""
+assert_eq "etime dd-hh:mm:ss" "$(uh_etime_hours 01-06:40:53)" "30"
+assert_eq "etime hh:mm:ss" "$(uh_etime_hours 04:46:14)" "4"
+assert_eq "etime mm:ss" "$(uh_etime_hours 06:04)" "0"
+out=$(uh_runaway_check 2360 168.8 01-06:40:53 /x/VTEncoderXPCService); assert_contains "runaway -> HIGH" "$out" "[HIGH] runaway process: pid 2360 VTEncoderXPCService at 168.8% CPU, running 30h"
+out=$(uh_runaway_check 1 95.0 00:20 /x/y); assert_eq "short burst not runaway" "$out" ""
+out=$(uh_runaway_check 1 40.0 05:00:00 /x/y); assert_eq "low cpu not runaway" "$out" ""
+out=$(uh_sleep_blocker_check '   pid 666(Claude): [0x0000005c000180e3] 31:06:21 NoIdleSleepAssertion named: "Electron"  ')
+assert_contains "sleep blocker 31h -> MED" "$out" "[MED] 'Claude' has kept the Mac from sleeping for 31:06:21"
+out=$(uh_sleep_blocker_check '   pid 714(sharingd): [0x00012d2e00019440] 00:03:43 PreventUserIdleSystemSleep named: "Handoff"  ')
+assert_eq "short assertion ignored" "$out" ""
+
 echo "== lib: paths"
 uh_is_system_path /usr/bin/ssh && ok "system path" || fail "system path"
 uh_is_system_path /Users/x/bin/ssh && fail "non-system path" || ok "non-system path"
@@ -51,6 +69,7 @@ uh_is_suspicious_path /Applications/Slack.app/Contents/MacOS/Slack && fail "app 
 uh_is_suspicious_path /opt/homebrew/bin/node && fail "homebrew not suspicious" || ok "homebrew not suspicious"
 uh_is_suspicious_path /Users/x/.nvm/versions/node/v22.0.0/bin/node && fail "nvm not suspicious" || ok "nvm not suspicious"
 uh_is_suspicious_path /Users/x/.cursor/extensions/x/bin/server && fail "cursor not suspicious" || ok "cursor not suspicious"
+uh_is_suspicious_path /Users/x/.hermes/tools/python/bin/python3 && fail "hermes not suspicious" || ok "hermes not suspicious"
 uh_is_suspicious_path /Users/x/.Trash/app && ok "Trash suspicious" || fail "Trash suspicious"
 assert_eq "hidden component" "$(uh_hidden_component /Users/x/.cargo/bin/rg)" ".cargo"
 uh_hidden_component /usr/bin/ssh >/dev/null && fail "no hidden component" || ok "no hidden component"

@@ -104,10 +104,11 @@ run batt -- pmset -g batt
 sub "Battery health from ioreg"
 IOREG="$(ioreg -rn AppleSmartBattery 2>/dev/null)"
 printf '%s\n' "$IOREG" | grep -E '"(CycleCount|DesignCapacity|AppleRawMaxCapacity|NominalChargeCapacity|MaxCapacity|Temperature|PermanentFailureStatus|AtCriticalLevel|FullyCharged|IsCharging|ExternalConnected)"'
-MAXCAP=$(printf '%s\n' "$IOREG" | sed -n 's/.*"AppleRawMaxCapacity" = \([0-9]*\).*/\1/p' | head -1)
-[ -n "$MAXCAP" ] || MAXCAP=$(printf '%s\n' "$IOREG" | sed -n 's/.*"NominalChargeCapacity" = \([0-9]*\).*/\1/p' | head -1)
-DESCAP=$(printf '%s\n' "$IOREG" | sed -n 's/.*"DesignCapacity" = \([0-9]*\).*/\1/p' | head -1)
-CYCLES=$(printf '%s\n' "$IOREG" | sed -n 's/.*"CycleCount" = \([0-9]*\).*/\1/p' | head -1)
+MAXCAP=$(uh_ioreg_num "$IOREG" AppleRawMaxCapacity)
+[ -n "$MAXCAP" ] || MAXCAP=$(uh_ioreg_num "$IOREG" FullChargeCapacity)
+[ -n "$MAXCAP" ] || MAXCAP=$(uh_ioreg_num "$IOREG" NominalChargeCapacity)
+DESCAP=$(uh_ioreg_num "$IOREG" DesignCapacity)
+CYCLES=$(uh_ioreg_num "$IOREG" CycleCount)
 PCT=$(uh_battery_health_pct "${MAXCAP:-0}" "${DESCAP:-0}")
 COND=$(system_profiler SPPowerDataType 2>/dev/null | sed -n 's/^ *Condition: *//p' | head -1)
 echo "health=${PCT}% (max ${MAXCAP:-?} / design ${DESCAP:-?} mAh) cycles=${CYCLES:-?} condition=${COND:-?}"
@@ -122,6 +123,12 @@ printf '%s\n' "$WAKELOG" | uh_wake_summary
 run pmsettings -- pmset -g custom
 sub "Top CPU consumers right now"
 run topcpu -- sh -c 'ps -Ao pid,user,%cpu,%mem,etime,comm -r | head -20'
+ps -Ao pid,%cpu,etime,comm -r | tail -n +2 | head -15 | while read -r pid cpu etime comm; do
+  uh_runaway_check "$pid" "$cpu" "$etime" "$comm"
+done
+pmset -g assertions 2>/dev/null | grep -E 'NoIdleSleepAssertion|PreventUserIdleSystemSleep|PreventSystemSleep' | grep -E '^ *pid' | while read -r line; do
+  uh_sleep_blocker_check "$line"
+done
 sub "Energy impact over the last week (coalition stats, if available)"
 run powermetrics -- sh -c 'if [ "$(id -u)" -eq 0 ]; then powermetrics -n 1 -i 1000 --samplers tasks 2>/dev/null | head -40; else echo "(needs sudo)"; fi'
 
@@ -136,7 +143,8 @@ inspect_plists() {   # inspect_plists <dir> <label>
     prog=$(/usr/libexec/PlistBuddy -c 'Print:ProgramArguments:0' "$f" 2>/dev/null)
     [ -n "$prog" ] || prog=$(/usr/libexec/PlistBuddy -c 'Print:Program' "$f" 2>/dev/null)
     auth=$(uh_codesign_authority "$prog")
-    printf '%-10s %-45s %-50s %s\n' "$tag" "$label" "$prog" "$auth"
+    printf '%-10s %-45s %-50s %s  (%s)\n' "$tag" "${label:-?}" "${prog:-?}" "$auth" "$(basename "$f")"
+    [ -n "$prog" ] || uh_flag LOW "$tag $(basename "$f") has no Program/ProgramArguments the script understands — open it and read it"
     if ! uh_is_apple_label "$label"; then
       case "$auth" in
         adhoc) if uh_is_trusted_dev_path "$prog"; then uh_flag LOW "$tag '$label' runs ad-hoc signed $prog (normal for homebrew/dev tools)"
@@ -266,7 +274,7 @@ if needs_sudo system-TCC; then tcc_dump "/Library/Application Support/com.apple.
 section "7. Applications, downloads, browser extensions, odd files"
 sub "Recent quarantine (download) events — what came in through the browser lately"
 QDB="$REAL_HOME/Library/Preferences/com.apple.LaunchServices/com.apple.LaunchServices.QuarantineEventsV2"
-run quarantine -- sh -c "sqlite3 '$QDB' \"select datetime(LSQuarantineTimeStamp + 978307200, 'unixepoch'), LSQuarantineAgentName, LSQuarantineDataURLString from LSQuarantineEvent order by LSQuarantineTimeStamp desc limit 30;\" 2>&1 | cut -c1-200"
+run quarantine -- sh -c "sqlite3 '$QDB' \"select datetime(LSQuarantineTimeStamp + 978307200, 'unixepoch'), LSQuarantineAgentName, LSQuarantineDataURLString from LSQuarantineEvent order by LSQuarantineTimeStamp desc limit 30;\" 2>&1 | cut -c1-200 | sed 's/^Parse error.*no such table.*/(this macOS no longer keeps a quarantine event table; check Finder > Downloads and Safari > Downloads manually)/'"
 sub "Applications and their signing authority"
 if [ "$MODE" = "quick" ]; then
   run apps -- sh -c 'ls -lt /Applications | head -40'

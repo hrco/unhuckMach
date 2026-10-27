@@ -47,6 +47,48 @@ uh_battery_verdict() {
   esac
 }
 
+# uh_ioreg_num <ioreg text> <key> -> first integer value for "key" = N or "key"=N (nested dicts too)
+uh_ioreg_num() {
+  printf '%s\n' "$1" | sed -n "s/.*\"$2\" *= *\([0-9][0-9]*\).*/\1/p" | head -1
+}
+
+# uh_etime_hours <ps etime: [[dd-]hh:]mm:ss> -> whole hours
+uh_etime_hours() {
+  local e="$1" d=0 h=0 rest
+  case "$e" in *-*) d="${e%%-*}"; e="${e#*-}";; esac
+  rest="$e"
+  case "$rest" in
+    *:*:*) h="${rest%%:*}";;
+    *) h=0;;
+  esac
+  case "$d$h" in *[!0-9]*) echo 0; return;; esac
+  echo $(( d * 24 + h ))
+}
+
+# uh_runaway_check <pid> <%cpu> <etime> <comm>: flags a process burning >90% CPU for >1h
+uh_runaway_check() {
+  local pid="$1" cpu="$2" etime="$3" comm="$4" hours whole
+  whole="${cpu%%.*}"
+  case "$whole" in ''|*[!0-9]*) return;; esac
+  hours=$(uh_etime_hours "$etime")
+  if [ "$whole" -ge 90 ] && [ "$hours" -ge 1 ]; then
+    uh_flag HIGH "runaway process: pid $pid $(basename "$comm") at ${cpu}% CPU, running ${hours}h — this alone empties a battery in 1–2h. Find its parent: ps -o ppid= -p $pid"
+  fi
+}
+
+# uh_sleep_blocker_check <pmset assertion line>: flags an app holding a sleep assertion >6h
+uh_sleep_blocker_check() {
+  local line="$1" name dur h
+  name=$(printf '%s\n' "$line" | sed -n 's/^ *pid [0-9]*(\([^)]*\)).*/\1/p')
+  dur=$(printf '%s\n' "$line" | sed -n 's/^ *pid [0-9]*([^)]*): \[[^]]*\] \([0-9:]*\) .*/\1/p')
+  [ -n "$dur" ] || return 0
+  h="${dur%%:*}"
+  case "$h" in ''|*[!0-9]*) return 0;; esac
+  if [ "$h" -ge 6 ]; then
+    uh_flag MED "'$name' has kept the Mac from sleeping for ${dur} (h:m:s). On battery that means no sleep when idle — quit it when unplugged"
+  fi
+}
+
 # uh_wake_summary < pmset -g log text  -> prints counts of wake kinds
 uh_wake_summary() {
   local dark=0 user=0 sleep=0 line
@@ -73,7 +115,7 @@ uh_is_system_path() {
 }
 
 # Hidden directories that normal developer tooling lives in (not suspicious by themselves).
-UH_KNOWN_DOTDIRS=" .nvm .cargo .rustup .local .pyenv .bun .deno .vscode .vscode-insiders .vscode-server .cursor .claude .codeium .windsurf .zed .docker .orbstack .colima .lima .rd .npm .yarn .pnpm .gem .rbenv .asdf .sdkman .volta .fnm .fvm .pub-cache .gradle .m2 .ollama .config .cache .oh-my-zsh .tmux .vim .nix-profile .nix-defexpr .krew .kube .minikube .ghcup .stack .cabal .opam .foundry .conda .miniconda3 .mamba .pixi .uv .rye .poetry .jenv .gvm .goenv .go .cocoapods .swiftpm .android .flutter .expo .continue .aider .pipx .virtualenvs .venv .espressif .platformio .arduino15 .wrangler .supabase .vercel .fly .op .1password .iterm2 .hammerspoon .karabiner .warp .ghostty .codex .gemini .grok "
+UH_KNOWN_DOTDIRS=" .nvm .cargo .rustup .local .pyenv .bun .deno .vscode .vscode-insiders .vscode-server .cursor .claude .codeium .windsurf .zed .docker .orbstack .colima .lima .rd .npm .yarn .pnpm .gem .rbenv .asdf .sdkman .volta .fnm .fvm .pub-cache .gradle .m2 .ollama .config .cache .oh-my-zsh .tmux .vim .nix-profile .nix-defexpr .krew .kube .minikube .ghcup .stack .cabal .opam .foundry .conda .miniconda3 .mamba .pixi .uv .rye .poetry .jenv .gvm .goenv .go .cocoapods .swiftpm .android .flutter .expo .continue .aider .pipx .virtualenvs .venv .espressif .platformio .arduino15 .wrangler .supabase .vercel .fly .op .1password .iterm2 .hammerspoon .karabiner .warp .ghostty .codex .gemini .grok .grokbot .hermes .opencode .antigravity-ide .cua-driver .oci .thumbnails .continue "
 
 # uh_hidden_component <path> -> prints the first path component that starts with a dot
 uh_hidden_component() {
